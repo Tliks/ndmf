@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 #endregion
@@ -50,42 +51,51 @@ namespace nadena.dev.ndmf.localization
         
         private Func<VisualElement, Action> GetLocalizationOperation(Type ty)
         {
-            if (!_localizers.TryGetValue(ty, out var action))
+            Func<VisualElement, Action> action;
+            try
             {
-                PropertyInfo m_label = ty.GetProperty("label") ?? ty.GetProperty("text");
-               
-                if (m_label == null)
+                if (!_localizers.TryGetValue(ty, out action))
                 {
-                    action = null;
-                }
-                else
-                {
-                    action = elem =>
+                    PropertyInfo m_label = ty.GetProperty("label") ?? ty.GetProperty("text");
+                
+                    if (m_label == null)
                     {
-                        var key = m_label.GetValue(elem) as string;
-                        
-                        if (key != null)
+                        action = null;
+                    }
+                    else
+                    {
+                        action = elem =>
                         {
-                            return () =>
+                            var key = m_label.GetValue(elem) as string;
+                            
+                            if (key != null)
                             {
-                                var new_label = _localizer.GetLocalizedString(key);
-                                if (!_localizer.TryGetLocalizedString(key + ":tooltip", out var tooltip))
+                                return () =>
                                 {
-                                    tooltip = null;
-                                }
+                                    var new_label = _localizer.GetLocalizedString(key);
+                                    if (!_localizer.TryGetLocalizedString(key + ":tooltip", out var tooltip))
+                                    {
+                                        tooltip = null;
+                                    }
 
-                                m_label.SetValue(elem, new_label);
-                                elem.tooltip = tooltip;
-                            };
-                        }
-                        else
-                        {
-                            return () => { };
-                        }
-                    };
+                                    m_label.SetValue(elem, new_label);
+                                    elem.tooltip = tooltip;
+                                };
+                            }
+                            else
+                            {
+                                return () => { };
+                            }
+                        };
+                    }
+
+                    _localizers[ty] = action;
                 }
-
-                _localizers[ty] = action;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Error getting localization operation for {ty}: {e}");
+                action = null;
             }
 
             return action;
