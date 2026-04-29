@@ -187,6 +187,11 @@ namespace nadena.dev.ndmf.preview
                     // Reuse the old node in its entirety
                     node = _node;
                     context = _context;
+
+                    TraceBuffer.RecordTraceEvent(
+                        "NodeController.Refresh.ReusedByNDMF",
+                        (_) => "NodeController: Reused prior node without plugin refresh"
+                    );
                 }
                 else
                 {
@@ -196,6 +201,28 @@ namespace nadena.dev.ndmf.preview
                             proxies.Select(p => (p.Item1, p.Item2.Renderer)),
                             context,
                             changes
+                        );
+                    }
+
+                    if (node == null)
+                    {
+                        TraceBuffer.RecordTraceEvent(
+                            "NodeController.Refresh.PluginResult",
+                            (_) => "NodeController: Plugin refresh returned null"
+                        );
+                    }
+                    else if (node == _node)
+                    {
+                        TraceBuffer.RecordTraceEvent(
+                            "NodeController.Refresh.PluginResult",
+                            (_) => "NodeController: Plugin refresh reused node"
+                        );
+                    }
+                    else
+                    {
+                        TraceBuffer.RecordTraceEvent(
+                            "NodeController.Refresh.PluginResult",
+                            (_) => "NodeController: Plugin refresh returned new node"
                         );
                     }
                 }
