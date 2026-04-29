@@ -159,7 +159,7 @@ namespace nadena.dev.ndmf.preview
 
         public async Task<NodeController> Refresh(
             List<(Renderer, ProxyObjectController, ObjectRegistry)> proxies,
-            RenderAspects changes,
+            RenderAspects upstreamChanges,
             string trace
         )
         {
@@ -181,12 +181,14 @@ namespace nadena.dev.ndmf.preview
                                                  _group.Renderers[0].gameObject.name);
 
                 IRenderFilterNode node;
+                RenderAspects nodeChanges;
 
-                if (changes == 0 && !IsInvalidated)
+                if (upstreamChanges == 0 && !IsInvalidated)
                 {
                     // Reuse the old node in its entirety
                     node = _node;
                     context = _context;
+                    nodeChanges = 0;
                 }
                 else
                 {
@@ -195,9 +197,10 @@ namespace nadena.dev.ndmf.preview
                         node = await _node.Refresh(
                             proxies.Select(p => (p.Item1, p.Item2.Renderer)),
                             context,
-                            changes
+                            upstreamChanges
                         );
                     }
+                    nodeChanges = node?.WhatChanged ?? 0;
                 }
 
                 RefCount refCount;
@@ -216,12 +219,7 @@ namespace nadena.dev.ndmf.preview
                 }
 
                 var controller = new NodeController(_filter, _group, node, proxies, refCount, context, registry);
-                controller.WhatChanged = changes | node.WhatChanged;
-
-                foreach (var proxy in proxies)
-                {
-                    proxy.Item2.ChangeFlags |= node.WhatChanged;
-                }
+                controller.WhatChanged = nodeChanges;
 
                 return controller;
             }

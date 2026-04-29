@@ -261,13 +261,11 @@ namespace nadena.dev.ndmf.preview
                                 $"Creating node for {stage.Filter} on {group.Renderers[0].gameObject.name} for generation {_generation}");
 #endif
                             NodeController? node = null;
+                            RenderAspects upstreamChanges = proxies.Select(p => p.Item2.ChangeFlags).Aggregate((a, b) => a | b);
                             
                             if (priorNode != null)
                             {
-                                RenderAspects changeFlags = proxies.Select(p => p.Item2.ChangeFlags)
-                                    .Aggregate((a, b) => a | b);
-
-                                node = await priorNode.Result.Refresh(proxies, changeFlags, trace);
+                                node = await priorNode.Result.Refresh(proxies, upstreamChanges, trace);
                                 if (node != null)
                                 {
                                     reused++;
@@ -286,9 +284,11 @@ namespace nadena.dev.ndmf.preview
                                 node.WhatChanged = RenderAspects.Everything;
                             }
                             
+                            var propagatedChanges = upstreamChanges | node.WhatChanged;
+
                             foreach (var proxy in proxies)
                             {
-                                proxy.Item2.ChangeFlags |= node.WhatChanged;
+                                proxy.Item2.ChangeFlags |= propagatedChanges;
                             }
 
                             return node;
