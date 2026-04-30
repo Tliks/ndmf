@@ -181,14 +181,14 @@ namespace nadena.dev.ndmf.preview
                                                  _group.Renderers[0].gameObject.name);
 
                 IRenderFilterNode node;
-                RenderAspects nodeChanges;
+                bool reusedNodeInEntirety;
 
                 if (upstreamChanges == 0 && !IsInvalidated)
                 {
                     // Reuse the old node in its entirety
                     node = _node;
                     context = _context;
-                    nodeChanges = 0;
+                    reusedNodeInEntirety = true;
 
                     TraceBuffer.RecordTraceEvent(
                         "NodeController.Refresh.ReusedByNDMF",
@@ -205,7 +205,7 @@ namespace nadena.dev.ndmf.preview
                             upstreamChanges
                         );
                     }
-                    nodeChanges = node?.WhatChanged ?? 0;
+                    reusedNodeInEntirety = false;
 
                     if (node == null)
                     {
@@ -244,6 +244,8 @@ namespace nadena.dev.ndmf.preview
                 {
                     refCount = new RefCount();
                 }
+
+                var nodeChanges = reusedNodeInEntirety ? 0 : node.WhatChanged;
 
                 var controller = new NodeController(_filter, _group, node, proxies, refCount, context, registry);
                 controller.WhatChanged = nodeChanges;
