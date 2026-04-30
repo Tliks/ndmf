@@ -87,7 +87,7 @@ namespace nadena.dev.ndmf.preview
             }
         }
 
-        public static Task<NodeController> Create(
+        public static Task<(NodeController Node, RenderAspects WhatChanged)> Create(
             IRenderFilter filter,
             RenderGroup group,
             List<(Renderer, ProxyObjectController, ObjectRegistry)> proxies,
@@ -97,7 +97,7 @@ namespace nadena.dev.ndmf.preview
             return Create(filter, group, ObjectRegistry.Merge(null, proxies.Select(p => p.Item3)), proxies, trace);
         }
 
-        private static async Task<NodeController> Create(
+        private static async Task<(NodeController Node, RenderAspects WhatChanged)> Create(
             IRenderFilter filter,
             RenderGroup group,
             ObjectRegistry registry,
@@ -126,11 +126,12 @@ namespace nadena.dev.ndmf.preview
                       " Registry dump:\n" + registry.RegistryDump());
 #endif
                 IRenderFilterNode node;
+                RenderAspects whatChanged;
                 using (var scope = new ObjectRegistryScope(registry))
                 {
                     var savedMaterials = group.Renderers.Select(r => r.sharedMaterials).ToArray();
 
-                    node = await filter.Instantiate(
+                    (node, whatChanged) = await filter.CreateNode(
                         group,
                         proxies.Select(p => (p.Item1, p.Item2.Renderer)),
                         context
@@ -153,11 +154,11 @@ namespace nadena.dev.ndmf.preview
                       " Registry dump:\n" + registry.RegistryDump());
 #endif
 
-                return new NodeController(filter, group, node, proxies, new RefCount(), context, registry);
+                return (new NodeController(filter, group, node, proxies, new RefCount(), context, registry), whatChanged);
             }
         }
 
-        public async Task<NodeController> Refresh(
+        public async Task<(NodeController Node, RenderAspects WhatChanged)> Refresh(
             List<(Renderer, ProxyObjectController, ObjectRegistry)> proxies,
             RenderAspects changes,
             string trace
@@ -181,26 +182,26 @@ namespace nadena.dev.ndmf.preview
                                                  _group.Renderers[0].gameObject.name);
 
                 IRenderFilterNode node;
-                bool reusedNodeInEntirety;
+                RenderAspects nodeChanges;
 
                 if (changes == 0 && !IsInvalidated)
                 {
                     // Reuse the old node in its entirety
                     node = _node;
+                    nodeChanges = 0;
                     context = _context;
-                    reusedNodeInEntirety = true;
                 }
                 else
                 {
                     using (var scope = new ObjectRegistryScope(registry))
                     {
-                        node = await _node.Refresh(
+                        (node, nodeChanges) = await _node.RefreshNode(
                             proxies.Select(p => (p.Item1, p.Item2.Renderer)),
                             context,
-                            changes
+                            changes,
+                            IsInvalidated
                         );
                     }
-                    reusedNodeInEntirety = false;
                 }
 
                 RefCount refCount;
@@ -211,19 +212,17 @@ namespace nadena.dev.ndmf.preview
                 }
                 else if (node == null)
                 {
-                    return null;
+                    return (null, 0);
                 }
                 else
                 {
                     refCount = new RefCount();
                 }
 
-                var nodeChanges = reusedNodeInEntirety ? 0 : node.WhatChanged;
-
                 var controller = new NodeController(_filter, _group, node, proxies, refCount, context, registry);
                 controller.WhatChanged = nodeChanges;
 
-                return controller;
+                return (controller, nodeChanges);
             }
         }
 

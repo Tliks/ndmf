@@ -193,11 +193,44 @@ namespace nadena.dev.ndmf.preview
         /// <param name="context">A compute context that is used to track which values your code depended on in
         ///     configuring this node. Changing these values will triger a recomputation of this node.</param>
         /// <returns></returns>
+        [Obsolete("Use CreateNode instead")]
         public Task<IRenderFilterNode> Instantiate(
             RenderGroup group,
             IEnumerable<(Renderer, Renderer)> proxyPairs,
             ComputeContext context
-        );
+        )
+        {
+            throw new NotImplementedException("Implement CreateNode instead.");
+        }
+
+        /// <summary>
+        /// Instantiates a node in the preview graph. This operation is used when creating a new proxy renderer, and may
+        /// perform relatively heavyweight operations to prepare the Mesh, Materials, and Textures for the renderer. It
+        /// may not modify other aspects of the renderer; however, these can be done in the OnFrame callback in the
+        /// returned IRenderFilterNode.
+        /// 
+        /// When making changes to meshes, textures, and materials, this node must create new instances of these objects,
+        /// and destroy them in `IRenderFilterNode.Dispose`.
+        /// </summary>
+        /// <param name="group"></param>
+        /// <param name="proxyPairs">An enumerable of (original, proxy) renderer pairs</param>
+        /// <param name="context">A compute context that is used to track which values your code depended on in
+        ///     configuring this node. Changing these values will triger a recomputation of this node.</param>
+        /// <returns>
+        /// The newly created node, and the render aspects this node changed for its initial output. This may trigger
+        /// updates of downstream nodes.
+        /// </returns>
+        public async Task<(IRenderFilterNode Node, RenderAspects WhatChanged)> CreateNode(
+            RenderGroup group,
+            IEnumerable<(Renderer, Renderer)> proxyPairs,
+            ComputeContext context
+        )
+        {
+#pragma warning disable CS0618
+            var node = await Instantiate(group, proxyPairs, context);
+#pragma warning restore CS0618
+            return (node, RenderAspects.Everything);
+        }
 
         /// <summary>
         ///     Evaluate whether the filter as a whole should be enabled. Returns true by default.
@@ -258,8 +291,10 @@ namespace nadena.dev.ndmf.preview
         /// call. This may trigger updates of downstream nodes.
         ///
         /// This value is ignored on the first generation of the node, created from `IRenderFilter.Instantiate`.
+        /// 
+        /// This property is retained for compatibility; implement RefreshNode instead.
         /// </summary>
-        public RenderAspects WhatChanged { get; }
+        public RenderAspects WhatChanged => RenderAspects.Everything;
 
         /// <summary>
         /// Recreates this RenderFilterNode, with a new set of target renderers. The node _may_ reuse state, including
@@ -270,8 +305,9 @@ namespace nadena.dev.ndmf.preview
         /// This function is passed a list of original-proxy object pairs, which are guaranteed to have the same
         /// original objects, in the same order, as the initial call to Instantiate, but will have new proxy objects.
         /// It is also passed an update flags field, which indicates which upstream nodes have changed since the last
-        /// update. This may be zero if the update was triggered by an invalidation on the compute context for this
-        /// node itself.
+        /// update.
+        /// This legacy API does not report self invalidation separately when upstream changes are also present; use
+        /// RefreshNode to observe that case.
         ///
         /// As with `IRenderFilter.Instantiate`, the OnFrame effects of prior stages in the pipeline will be applied
         /// before invoking this function. This ensures any changes to bones, blendshapes, etc will be reflected in this
@@ -282,9 +318,9 @@ namespace nadena.dev.ndmf.preview
         /// </summary>
         /// <param name="proxyPairs"></param>
         /// <param name="context"></param>
-        /// <param name="renderFilterContext"></param>
         /// <param name="updatedAspects"></param>
         /// <returns></returns>
+        [Obsolete("Use RefreshNode instead")]
         public Task<IRenderFilterNode> Refresh(
             IEnumerable<(Renderer, Renderer)> proxyPairs,
             ComputeContext context,
@@ -292,6 +328,47 @@ namespace nadena.dev.ndmf.preview
         )
         {
             return Task.FromResult<IRenderFilterNode>(null);
+        }
+
+        /// <summary>
+        /// Recreates this RenderFilterNode, with a new set of target renderers. The node _may_ reuse state, including
+        /// things such as output RenderTextures, from its prior run. It may also fast-fail and return null; in this
+        /// case, the preview pipeline will create a new node from its original `IRenderFilter` instead. Finally,
+        /// it may return itself; in this case, it will continue to be used with the new renderers. 
+        ///
+        /// This function is passed a list of original-proxy object pairs, which are guaranteed to have the same
+        /// original objects, in the same order, as the initial call to Instantiate, but will have new proxy objects.
+        /// It is also passed an update flags field, which indicates which upstream nodes have changed since the last
+        /// update, and a self invalidation flag, which indicates whether this node's compute context was invalidated.
+        /// updatedAspects may be zero when only this node was invalidated; selfInvalidated may also be true when
+        /// updatedAspects is non-zero.
+        ///
+        /// As with `IRenderFilter.Instantiate`, the OnFrame effects of prior stages in the pipeline will be applied
+        /// before invoking this function. This ensures any changes to bones, blendshapes, etc will be reflected in this
+        /// mesh.
+        ///
+        /// This function must not destroy the original Node. If it chooses to share resources with the original node,
+        /// those resources must not be released until both old and new nodes are destroyed.
+        /// </summary>
+        /// <param name="proxyPairs"></param>
+        /// <param name="context"></param>
+        /// <param name="updatedAspects"></param>
+        /// <param name="selfInvalidated">True if this node's compute context was invalidated.</param>
+        /// <returns>
+        /// The refreshed node, and the render aspects changed relative to the previous node. This may trigger updates
+        /// of downstream nodes.
+        /// </returns>
+        public async Task<(IRenderFilterNode Node, RenderAspects WhatChanged)> RefreshNode(
+            IEnumerable<(Renderer, Renderer)> proxyPairs,
+            ComputeContext context,
+            RenderAspects updatedAspects,
+            bool selfInvalidated
+        )
+        {
+#pragma warning disable CS0618
+            var node = await Refresh(proxyPairs, context, updatedAspects);
+#pragma warning restore CS0618
+            return (node, node?.WhatChanged ?? 0);
         }
 
         /// <summary>
