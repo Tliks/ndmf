@@ -152,8 +152,10 @@ namespace nadena.dev.ndmf.preview
                       group.Renderers[0].gameObject.name +
                       " Registry dump:\n" + registry.RegistryDump());
 #endif
+                var controller = new NodeController(filter, group, node, proxies, new RefCount(), context, registry);
+                controller.WhatChanged = node.WhatChanged;
 
-                return new NodeController(filter, group, node, proxies, new RefCount(), context, registry);
+                return controller;
             }
         }
 
