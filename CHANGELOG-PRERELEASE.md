@@ -8,12 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- [#775] Add Optional KeyComparer argument to `PropCache`.
 
 ### Fixed
 - [#766] Deduplicate results in `ComputeContext.GetAvatarRoots()`
 - [#777] Unnecessary preview refreshes during pipeline rebuilds.
 
 ### Changed
+- [#775] Improve target acquisition performance in preview.
 
 ### Removed
 
