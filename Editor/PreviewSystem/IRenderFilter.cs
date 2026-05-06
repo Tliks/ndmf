@@ -55,9 +55,9 @@ namespace nadena.dev.ndmf.preview
         /// Returns a RenderGroup with additional data attached.
         /// The attached data can be retrieved later using GetData.
         /// 
-        /// This overload uses legacy heuristic equality rules; use the explicit comparer overload instead.
+        /// This overload uses legacy heuristic equality rules; use an explicit equality overload instead.
         /// </summary>
-        [Obsolete("Use WithData<T>(T, IEqualityComparer<T>) instead.")]
+        [Obsolete("Use an explicit equality overload instead.")]
         public RenderGroup WithData<T>(T data)
         {
             return new RenderGroup<T>(Renderers, DebugNames, data, LegacyContextEqualityComparer<T>.Instance);
@@ -67,7 +67,7 @@ namespace nadena.dev.ndmf.preview
         /// Returns a RenderGroup with additional data attached.
         /// The attached data can be retrieved later using GetData.
         /// 
-        /// The comparer defines how the attached data participates in RenderGroup identity,
+        /// The equality function defines how the attached data participates in RenderGroup identity,
         /// which may be used to retain target groups or reuse preview nodes.
         /// A filter must use consistent equality semantics for the same data type.
         /// </summary>
