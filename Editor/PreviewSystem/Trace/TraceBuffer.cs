@@ -109,22 +109,36 @@ namespace nadena.dev.ndmf.preview.trace
             }
         }
 
-        private static TraceEvent GetTraceEvent(long eventIndex)
+        private static TraceEvent GetTraceEvent(long eventId)
         {
-            if (eventIndex < 0 || eventIndex >= _totalTraceEvents)
+            if (eventId < 0 || eventId >= _totalTraceEvents)
             {
                 return new TraceEvent()
                 {
                     Timestamp = 0,
                     EditorFrame = 0,
-                    EventType = "???",
-                    FormatEvent = (ev) => "???",
-                    EventId = eventIndex,
+                    EventType = "TraceBuffer.EventOutOfRange",
+                    FormatEvent = (ev) => $"Trace event {ev.EventId} is out of range",
+                    EventId = eventId,
+                    ParentEventId = null
+                };
+            }
+
+            var traceEvent = _traceEvents[(int)(eventId % _traceEvents.Length)];
+            if (traceEvent.EventId != eventId)
+            {
+                return new TraceEvent()
+                {
+                    Timestamp = 0,
+                    EditorFrame = 0,
+                    EventType = "TraceBuffer.EventExpired",
+                    FormatEvent = (ev) => $"Trace event {ev.EventId} is no longer available",
+                    EventId = eventId,
                     ParentEventId = null
                 };
             }
             
-            return _traceEvents[(int)(eventIndex % _traceEvents.Length)];
+            return traceEvent;
         }
 
         internal static List<(string, string)> FormatTraceBuffer(int maxEvents, TraceEventLevel minLevel = TraceEventLevel.Info)
