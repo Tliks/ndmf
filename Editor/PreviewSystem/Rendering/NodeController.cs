@@ -189,6 +189,11 @@ namespace nadena.dev.ndmf.preview
                     node = _node;
                     context = _context;
                     reusedNodeInEntirety = true;
+
+                    TraceBuffer.RecordTraceEvent(
+                        "NodeController.Refresh.ReusedByNDMF",
+                        (_) => "NodeController: Reused prior node without plugin refresh"
+                    );
                 }
                 else
                 {
@@ -201,6 +206,28 @@ namespace nadena.dev.ndmf.preview
                         );
                     }
                     reusedNodeInEntirety = false;
+
+                    if (node == null)
+                    {
+                        TraceBuffer.RecordTraceEvent(
+                            "NodeController.Refresh.PluginResult",
+                            (_) => "NodeController: Plugin refresh returned null"
+                        );
+                    }
+                    else if (node == _node)
+                    {
+                        TraceBuffer.RecordTraceEvent(
+                            "NodeController.Refresh.PluginResult",
+                            (_) => "NodeController: Plugin refresh reused node"
+                        );
+                    }
+                    else
+                    {
+                        TraceBuffer.RecordTraceEvent(
+                            "NodeController.Refresh.PluginResult",
+                            (_) => "NodeController: Plugin refresh returned new node"
+                        );
+                    }
                 }
 
                 RefCount refCount;
