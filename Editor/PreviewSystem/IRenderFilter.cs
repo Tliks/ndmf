@@ -71,6 +71,19 @@ namespace nadena.dev.ndmf.preview
         /// which may be used to retain target groups or reuse preview nodes.
         /// A filter must use consistent equality semantics for the same data type.
         /// </summary>
+        public RenderGroup WithData<T>(T data, Func<T, T, bool> equals)
+        {
+            return new RenderGroup<T>(Renderers, DebugNames, data, new DelegateEqualityComparer<T>(equals));
+        }
+
+        /// <summary>
+        /// Returns a RenderGroup with additional data attached.
+        /// The attached data can be retrieved later using GetData.
+        /// 
+        /// The comparer defines how the attached data participates in RenderGroup identity,
+        /// which may be used to retain target groups or reuse preview nodes.
+        /// A filter must use consistent equality semantics for the same data type.
+        /// </summary>
         public RenderGroup WithData<T>(T data, IEqualityComparer<T> comparer)
         {
             return new RenderGroup<T>(Renderers, DebugNames, data, comparer);
@@ -178,6 +191,26 @@ namespace nadena.dev.ndmf.preview
 
             var live = Renderers.Where(r => r != null).ToImmutableList();
             return new RenderGroup<T>(live, DebugNames, Context, _contextComparer);
+        }
+    }
+
+    internal sealed class DelegateEqualityComparer<T> : IEqualityComparer<T>
+    {
+        private readonly Func<T, T, bool> _equals;
+
+        public DelegateEqualityComparer(Func<T, T, bool> equals)
+        {
+            _equals = equals;
+        }
+
+        public bool Equals(T x, T y)
+        {
+            return _equals(x, y);
+        }
+
+        public int GetHashCode(T obj)
+        {
+            return 0;
         }
     }
 
