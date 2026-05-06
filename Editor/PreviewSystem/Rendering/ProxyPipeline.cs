@@ -283,8 +283,6 @@ namespace nadena.dev.ndmf.preview
                             if (node == null)
                             {
                                 node = await NodeController.Create(stage.Filter, group, items.Result.ToList(), trace);
-                                // Force a rebuild of downstream nodes
-                                node.WhatChanged = RenderAspects.Everything;
                             }
                             
                             foreach (var proxy in proxies)
