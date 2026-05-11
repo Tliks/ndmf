@@ -165,12 +165,6 @@ namespace nadena.dev.ndmf.preview
 #endif
 
             Dictionary<Renderer, Task<NodeController>> nodeTasks = new();
-
-            var priorStagesByFilter = priorPipeline?._stages.ToDictionary(
-                s => s.Filter,
-                ReferenceEqualityComparer<IRenderFilter>.Instance
-            );
-            
             int total_nodes = 0;
             int reused = 0;
             int refresh_failed = 0;
@@ -186,14 +180,11 @@ namespace nadena.dev.ndmf.preview
                 
                 _stages.Add(stage);
 
-                var priorStage = priorStagesByFilter?.GetValueOrDefault(stage.Filter);
-                var priorNodesByGroup = priorStage?.NodeTasks
-                    .Where(priorNode => priorNode.IsCompletedSuccessfully)
-                    .Aggregate(new Dictionary<RenderGroup, Task<NodeController>>(), (dict, priorNode) =>
-                    {
-                        dict.TryAdd(priorNode.Result.Group, priorNode);
-                        return dict;
-                    });
+                var prior = priorPipeline?._stages.ElementAtOrDefault(i);
+                if (prior?.Filter != stage.Filter)
+                {
+                    prior = null;
+                }
 
                 int groupIndex = -1;
                 foreach (var group_raw in stage.Originals.OrderBy(g => g.GetHashCode()))
@@ -245,8 +236,13 @@ namespace nadena.dev.ndmf.preview
                         continue;
                     }
 
-                    Task<NodeController>? priorNode = null;
-                    priorNodesByGroup?.TryGetValue(group, out priorNode);
+                    var priorNode = prior?.NodeTasks.ElementAtOrDefault(groupIndex);
+                    var sameGroup = Equals(priorNode?.Result.Group, group);
+                    if (priorNode?.IsCompletedSuccessfully != true || !sameGroup)
+                    {
+                        //System.Diagnostics.UnityEngine.Debug.Log("Failed to reuse node: priorNode != null: " + (priorNode != null) + ", sameGroup: " + sameGroup);
+                        priorNode = null;
+                    }
 
                     var node = Task.WhenAll(resolved).ContinueWith(async items =>
                         {

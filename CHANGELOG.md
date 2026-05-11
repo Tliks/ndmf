@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#786] Fixed an issue where an `IRenderFilter` instance could be registered multiple times.
 
 ### Changed
-- [#788] Improve preview node reuse matching to reduce unnecessary node rebuilds.
 
 ### Removed
 
