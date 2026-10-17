@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using nadena.dev.ndmf.runtime;
+using Unity.Profiling;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -89,6 +90,8 @@ namespace nadena.dev.ndmf
     /// </summary>
     public sealed class ObjectRegistry : IObjectRegistry
     {
+        private static readonly ProfilerMarker MergeMarker = new("ObjectRegistry.Merge");
+
         // Reference hash code => objects
         private readonly Dictionary<Object, ObjectReference> _obj2ref = new();
 
@@ -104,6 +107,7 @@ namespace nadena.dev.ndmf
 
         internal static ObjectRegistry Merge(Transform avatarRoot, IEnumerable<ObjectRegistry> inputs)
         {
+            using var sample = MergeMarker.Auto();
             var newRegistry = new ObjectRegistry(null);
 
             foreach (var kvp in inputs.SelectMany(FlattenEntries)) newRegistry._obj2ref[kvp.Key] = kvp.Value;

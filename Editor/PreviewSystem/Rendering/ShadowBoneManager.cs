@@ -22,6 +22,10 @@ namespace nadena.dev.ndmf.preview
     {
         private static int editorFrameCount;
 
+        private static readonly ProfilerMarker EnterStageMarker = new("ShadowBoneManager.EnterStage");
+        private static readonly ProfilerMarker CaptureStageMarker = new("ShadowBoneManager.CaptureFinalState");
+        private static readonly ProfilerMarker GetBonesMarker = new("ShadowBoneManager.GetBones");
+        private static readonly ProfilerMarker ReplaceBonesMarker = new("ShadowBoneManager.ReplaceBones");
         private static readonly ProfilerMarker UpdateMarker = new("ShadowBoneManager.Update");
         private static readonly ProfilerMarker CompleteMarker = new("ShadowBoneManager.CompleteTransfers");
         private static readonly ProfilerMarker ReadScheduleMarker = new("ShadowBoneManager.ReadTransforms.Schedule");
@@ -231,6 +235,7 @@ namespace nadena.dev.ndmf.preview
 
             private void CaptureFinalState()
             {
+                using var sample = CaptureStageMarker.Auto();
                 var stageState = _manager._replacements[_stage];
                 foreach (var (renderer, proxy) in _stateProxies)
                 {
@@ -348,6 +353,7 @@ namespace nadena.dev.ndmf.preview
 
         internal Dictionary<Transform, Transform> GetBones(IEnumerable<Transform> bones)
         {
+            using var sample = GetBonesMarker.Auto();
             ThrowIfDisposed();
             PreviewContext.Instance.VerifyShadowBoneManagerLease(this);
 
@@ -369,6 +375,7 @@ namespace nadena.dev.ndmf.preview
         internal void ReplaceBones(Renderer originalRenderer,
             IReadOnlyDictionary<Transform, Transform> replacements)
         {
+            using var sample = ReplaceBonesMarker.Auto();
             ThrowIfDisposed();
             PreviewContext.Instance.VerifyShadowBoneManagerLease(this);
             var proxy = GetReplacementProxy(originalRenderer);
@@ -487,6 +494,7 @@ namespace nadena.dev.ndmf.preview
             IReadOnlyDictionary<Renderer, Renderer> proxies
         )
         {
+            using var sample = EnterStageMarker.Auto();
             ThrowIfDisposed();
 
             // Ensure stage 0 has all proxies registered
