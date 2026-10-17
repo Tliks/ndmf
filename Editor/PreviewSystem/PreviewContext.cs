@@ -208,4 +208,53 @@ namespace nadena.dev.ndmf.preview
         /// <param name="replacement">The transform to use in place of <paramref name="original" />.</param>
         void ReplaceBone(Renderer originalRenderer, Transform original, Transform replacement);
     }
+
+    /// <summary>
+    ///     Batched shadow-bone operations. The standard manager applies renderer references once per batch;
+    ///     custom handles use the individual operations.
+    /// </summary>
+    [PublicAPI]
+    public static class ShadowBoneManagerExtensions
+    {
+        /// <summary>
+        ///     Requests shadows for the supplied non-null source transforms, including their parents.
+        ///     Renderer references are updated before this method returns.
+        /// </summary>
+        public static Dictionary<Transform, Transform> GetBones(
+            this IShadowBoneManagerHandle manager, IEnumerable<Transform> bones)
+        {
+            if (manager is ShadowBoneManager standardManager)
+            {
+                return standardManager.GetBones(bones);
+            }
+
+            var result = new Dictionary<Transform, Transform>();
+            foreach (var bone in bones)
+            {
+                result[bone] = manager.GetBone(bone);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        ///     Applies exact replacements to one renderer in enumeration order, with the same matching rules
+        ///     and stage restrictions as <see cref="IShadowBoneManagerHandle.ReplaceBone"/>.
+        ///     Renderer references are updated before this method returns.
+        /// </summary>
+        public static void ReplaceBones(this IShadowBoneManagerHandle manager, Renderer originalRenderer,
+            IReadOnlyDictionary<Transform, Transform> replacements)
+        {
+            if (manager is ShadowBoneManager standardManager)
+            {
+                standardManager.ReplaceBones(originalRenderer, replacements);
+                return;
+            }
+
+            foreach (var (original, replacement) in replacements)
+            {
+                manager.ReplaceBone(originalRenderer, original, replacement);
+            }
+        }
+    }
 }

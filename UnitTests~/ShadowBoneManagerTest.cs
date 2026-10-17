@@ -110,6 +110,7 @@ namespace UnitTests
                 _context.ShadowBoneManager = new FakeShadowBoneManagerHandle());
 
             var source = CreateRoot("source");
+            var renderer = source.AddComponent<SkinnedMeshRenderer>();
             var staleContext = _context;
             _manager.GetBone(source.transform);
 
@@ -118,6 +119,9 @@ namespace UnitTests
             using (staleContext.Activate())
             {
                 Assert.Throws<InvalidOperationException>(() => _manager.GetBone(source.transform));
+                Assert.Throws<InvalidOperationException>(() => _manager.Handle.GetBones(new[] { source.transform }));
+                Assert.Throws<InvalidOperationException>(() => _manager.Handle.ReplaceBones(
+                    renderer, new Dictionary<Transform, Transform> { { source.transform, source.transform } }));
             }
         }
 
@@ -148,6 +152,8 @@ namespace UnitTests
                         await stageDisposed.Task;
                         Assert.Throws<InvalidOperationException>(() =>
                             _manager.ReplaceBone(original, sourceTransform, replacementTransform));
+                        Assert.Throws<InvalidOperationException>(() => _manager.Handle.ReplaceBones(
+                            original, new Dictionary<Transform, Transform> { { sourceTransform, replacementTransform } }));
                     }, CancellationToken.None, TaskCreationOptions.None, mainThreadScheduler).Unwrap();
                 }
 
@@ -536,6 +542,142 @@ namespace UnitTests
 
             Assert.That((UnityEngine.Object)proxy == null, Is.True);
             Assert.Throws<ObjectDisposedException>(() => _manager.GetBone(source.transform));
+            Assert.Throws<ObjectDisposedException>(() => _manager.Handle.GetBones(new[] { source.transform }));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void BatchedRegistrationPreservesReferencesAndReplaysAcrossPipelines(bool useBatch)
+        {
+            var sourceObject = CreateRoot("source");
+            var source = sourceObject.transform;
+            var child = CreateChild(sourceObject, "child").transform;
+            var replacement = CreateRoot("replacement").transform;
+            var finalReplacement = CreateRoot("final replacement").transform;
+            var original = CreateRoot("original").AddComponent<SkinnedMeshRenderer>();
+            var setupProxy = CreateRoot("setup proxy").AddComponent<SkinnedMeshRenderer>();
+            var activeProxy = CreateRoot("active proxy").AddComponent<SkinnedMeshRenderer>();
+            var otherOriginal = CreateRoot("other original").AddComponent<SkinnedMeshRenderer>();
+            var otherProxy = CreateRoot("other proxy").AddComponent<SkinnedMeshRenderer>();
+
+            // The second pipeline must restore registrations even when all shadows already exist.
+            for (var pipeline = 0; pipeline < 2; pipeline++)
+            {
+                if (pipeline != 0)
+                {
+                    ResetManagerLease();
+                }
+
+                SetRendererReferences(setupProxy, source, source);
+                setupProxy.bones = new[] { source, child, source, null };
+                SetRendererReferences(otherProxy, source, source);
+                var setupProxies = new Dictionary<Renderer, Renderer>
+                {
+                    { original, setupProxy }, { otherOriginal, otherProxy }
+                };
+
+                using (var stage = _manager.EnterStage(1, setupProxies))
+                {
+                    var handle = _manager.Handle;
+                    var shadows = useBatch
+                        ? handle.GetBones(new[] { child, source, child })
+                        : new Dictionary<Transform, Transform>
+                        {
+                            { child, handle.GetBone(child) }, { source, handle.GetBone(source) }
+                        };
+
+                    Assert.That(shadows.Count, Is.EqualTo(2));
+                    Assert.That(shadows[child].parent, Is.SameAs(shadows[source]));
+                    AssertRendererReferences(setupProxy, shadows[source],
+                        shadows[source], shadows[child], shadows[source], null);
+                    AssertRendererReferences(otherProxy, shadows[source], shadows[source]);
+
+                    // Capture a mix of original and implicit-shadow references.
+                    setupProxy.bones = new[] { source, shadows[source], child, null };
+                    Replace(new Dictionary<Transform, Transform>
+                    {
+                        { source, child }, { child, replacement }
+                    });
+                    AssertRendererReferences(setupProxy, child, child, child, replacement, null);
+
+                    Replace(new Dictionary<Transform, Transform>
+                    {
+                        { source, finalReplacement }, { child, replacement }
+                    });
+                    AssertRendererReferences(setupProxy, finalReplacement,
+                        finalReplacement, finalReplacement, replacement, null);
+                    AssertRendererReferences(otherProxy, shadows[source], shadows[source]);
+                    stage.Commit();
+                }
+
+                _manager.SealPipeline();
+                SetRendererReferences(activeProxy, source, source);
+                ReplayThroughStage(1, new Dictionary<Renderer, Renderer> { { original, activeProxy } });
+                AssertRendererReferences(activeProxy, finalReplacement,
+                    finalReplacement, finalReplacement, replacement, null);
+            }
+
+            void Replace(Dictionary<Transform, Transform> replacements)
+            {
+                if (useBatch)
+                {
+                    _manager.Handle.ReplaceBones(original, replacements);
+                }
+                else
+                {
+                    foreach (var (bone, target) in replacements)
+                    {
+                        _manager.ReplaceBone(original, bone, target);
+                    }
+                }
+            }
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void BatchedReplacementsPreserveOrderForOverlappingShadowSources(bool useBatch, bool reverseOrder)
+        {
+            var source = CreateRoot("source").transform;
+            var firstReplacement = CreateRoot("first replacement").transform;
+            var secondReplacement = CreateRoot("second replacement").transform;
+            var original = CreateRoot("original").AddComponent<SkinnedMeshRenderer>();
+            var setupProxy = CreateRoot("setup proxy").AddComponent<SkinnedMeshRenderer>();
+            var shadow = _manager.GetBone(source);
+            SetRendererReferences(setupProxy, shadow, shadow);
+
+            using (var stage = _manager.EnterStage(
+                       1, new Dictionary<Renderer, Renderer> { { original, setupProxy } }))
+            {
+                var replacements = new Dictionary<Transform, Transform>();
+                if (reverseOrder)
+                {
+                    replacements.Add(shadow, secondReplacement);
+                    replacements.Add(source, firstReplacement);
+                }
+                else
+                {
+                    replacements.Add(source, firstReplacement);
+                    replacements.Add(shadow, secondReplacement);
+                }
+
+                if (useBatch)
+                {
+                    _manager.Handle.ReplaceBones(original, replacements);
+                }
+                else
+                {
+                    foreach (var (bone, target) in replacements)
+                    {
+                        _manager.ReplaceBone(original, bone, target);
+                    }
+                }
+
+                var expected = reverseOrder ? secondReplacement : firstReplacement;
+                AssertRendererReferences(setupProxy, expected, expected);
+                stage.Commit();
+            }
         }
 
         [Test]
