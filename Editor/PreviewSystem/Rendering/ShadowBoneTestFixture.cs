@@ -42,6 +42,11 @@ namespace nadena.dev.ndmf.preview
             if (rendererMap == null) throw new ArgumentNullException(nameof(rendererMap));
             if (operation == null) throw new ArgumentNullException(nameof(operation));
 
+            foreach (var (original, proxy) in rendererMap)
+            {
+                _manager.SetInitialParent(original, proxy);
+            }
+
             using var stageScope = _manager.EnterStage(0, rendererMap);
             var result = operation();
             if (result != null) stageScope.Commit();

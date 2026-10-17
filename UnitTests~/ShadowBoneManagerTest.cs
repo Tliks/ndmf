@@ -634,6 +634,7 @@ namespace UnitTests
             unlisted.rootBone = source.transform;
             unlisted.probeAnchor = source.transform;
 
+            _manager.SetInitialParent(meshOriginal, mesh);
             using (var stage = _manager.EnterStage(
                        2,
                        new Dictionary<Renderer, Renderer> { { skinned, skinned }, { meshOriginal, mesh } }
@@ -748,6 +749,7 @@ namespace UnitTests
                 renderer.transform.SetParent(source.transform, false);
             }
 
+            _manager.SetInitialParent(originalMesh, setupMesh);
             using (var stage = _manager.EnterStage(
                        2,
                        new Dictionary<Renderer, Renderer>
@@ -818,6 +820,7 @@ namespace UnitTests
             activeProxy.transform.localRotation = Quaternion.Euler(10, 20, 30);
             activeProxy.transform.localScale = new Vector3(2, 3, 4);
 
+            _manager.SetInitialParent(original, setupProxy);
             _manager.RegisterRendererStage(original, 2);
             using (var stage = _manager.EnterStage(
                        2,
@@ -906,6 +909,7 @@ namespace UnitTests
             var setupProxy = CreateRoot("setup proxy").AddComponent<MeshRenderer>();
             var activeProxy = CreateRoot("active proxy").AddComponent<MeshRenderer>();
 
+            _manager.SetInitialParent(original, setupProxy);
             using (_manager.EnterStage(
                        1,
                        new Dictionary<Renderer, Renderer> { { original, setupProxy } }
@@ -914,7 +918,6 @@ namespace UnitTests
             }
 
             _manager.SealPipeline();
-            _manager.SetInitialParent(original, activeProxy);
             ReplayThroughStage(
                 1,
                 new Dictionary<Renderer, Renderer> { { original, activeProxy } }
