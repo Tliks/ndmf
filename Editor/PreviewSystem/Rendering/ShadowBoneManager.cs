@@ -396,7 +396,6 @@ namespace nadena.dev.ndmf.preview
             {
                 if (!stageZero.ContainsKey(renderer))
                 {
-                    SetInitialParent(renderer, proxy);
                     stageZero[renderer] = new RendererReplacementState(proxy);
                 }
             }
@@ -421,9 +420,11 @@ namespace nadena.dev.ndmf.preview
             var targetParent = GetBoneInternal(original.transform);
 
             var proxyTransform = proxy.transform;
-            if (targetParent == proxyTransform.parent) return;
+            if (targetParent != proxyTransform.parent)
+            {
+                proxyTransform.SetParent(targetParent, false);
+            }
 
-            proxyTransform.SetParent(targetParent, false);
             proxyTransform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
             proxyTransform.localScale = Vector3.one;
         }
@@ -431,10 +432,18 @@ namespace nadena.dev.ndmf.preview
         internal void OnFrameStart(int stageIndex, IReadOnlyDictionary<Renderer, Renderer> activeProxies)
         {
             ThrowIfDisposed();
-            if (stageIndex == 0 && _lastUpdateFrame != editorFrameCount)
+            if (stageIndex == 0)
             {
-                _lastUpdateFrame = editorFrameCount;
-                UpdateAllBones();
+                if (_lastUpdateFrame != editorFrameCount)
+                {
+                    _lastUpdateFrame = editorFrameCount;
+                    UpdateAllBones();
+                }
+
+                foreach (var (original, proxy) in activeProxies)
+                {
+                    SetInitialParent(original, proxy);
+                }
             }
 
             ReplayStage(stageIndex, activeProxies);

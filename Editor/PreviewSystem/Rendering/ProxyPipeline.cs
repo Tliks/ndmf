@@ -336,6 +336,10 @@ namespace nadena.dev.ndmf.preview
                             {
                                 Invalidate();
                             }
+                            else
+                            {
+                                _shadowBoneManager.SetInitialParent(r, proxy.Renderer);
+                            }
 
                             // OnPreFrame can enable rendering, turn it off for now (until the pipeline goes active and
                             // we render for real).
