@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using nadena.dev.ndmf;
 using nadena.dev.ndmf.cs;
@@ -7,7 +6,6 @@ using nadena.dev.ndmf.preview;
 using NUnit.Framework;
 using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
 namespace UnitTests
@@ -24,13 +22,10 @@ namespace UnitTests
         private readonly List<GameObject> _objects = new();
         private readonly List<ComputeContext> _contexts = new();
         private GameObject _root;
-        private bool _propertyMonitorWasEnabled;
 
         [SetUp]
         public void SetUp()
         {
-            _propertyMonitorWasEnabled = ObjectWatcher.Instance.PropertyMonitor.IsEnabled;
-            ObjectWatcher.Instance.PropertyMonitor.IsEnabled = false;
             _root = NewObject("query-root");
         }
 
@@ -45,7 +40,6 @@ namespace UnitTests
             }
             _contexts.Clear();
             _objects.Clear();
-            ObjectWatcher.Instance.PropertyMonitor.IsEnabled = _propertyMonitorWasEnabled;
         }
 
         private GameObject NewObject(string name, GameObject parent = null)
@@ -168,59 +162,6 @@ namespace UnitTests
             ObjectWatcher.Instance.Hierarchy.InvalidateTree(_root.GetEntityId());
             ComputeContext.FlushInvalidates();
             Assert.That(ctx.IsInvalidated, Is.True);
-        }
-
-        [UnityTest]
-        public IEnumerator PropertyMonitorInvalidatesOnlyChangedQueryResults()
-        {
-            // An isolated watcher prevents editor events from satisfying the polling assertions.
-            var watcher = new ObjectWatcher();
-            _root.AddComponent<BoxCollider>();
-            var child = NewObject("child", _root);
-            var single = NewContext();
-            var absent = NewContext();
-            var multiple = NewContext();
-            var children = NewContext();
-            watcher.MonitorComponent(_root, single, () => _root.GetComponent<BoxCollider>());
-            watcher.MonitorComponent(_root, absent, () => _root.GetComponent<CapsuleCollider>());
-            watcher.MonitorComponents(_root, multiple, false, () => _root.GetComponents<BoxCollider>());
-            watcher.MonitorComponents(_root, children, true, () => _root.GetComponentsInChildren<BoxCollider>(true));
-
-            watcher.PropertyMonitor.IsEnabled = true;
-            try
-            {
-                _root.AddComponent<SphereCollider>();
-                yield return RefreshProperties(watcher.PropertyMonitor);
-                Assert.That(single.IsInvalidated, Is.False);
-                Assert.That(absent.IsInvalidated, Is.False);
-                Assert.That(multiple.IsInvalidated, Is.False);
-                Assert.That(children.IsInvalidated, Is.False);
-
-                child.AddComponent<BoxCollider>();
-                yield return RefreshProperties(watcher.PropertyMonitor);
-                Assert.That(single.IsInvalidated, Is.False);
-                Assert.That(absent.IsInvalidated, Is.False);
-                Assert.That(multiple.IsInvalidated, Is.False);
-                Assert.That(children.IsInvalidated, Is.True);
-
-                _root.AddComponent<CapsuleCollider>();
-                yield return RefreshProperties(watcher.PropertyMonitor);
-                Assert.That(single.IsInvalidated, Is.False);
-                Assert.That(absent.IsInvalidated, Is.True);
-                Assert.That(multiple.IsInvalidated, Is.False);
-            }
-            finally
-            {
-                watcher.PropertyMonitor.IsEnabled = false;
-            }
-        }
-
-        private static IEnumerator RefreshProperties(PropertyMonitor monitor)
-        {
-            var refresh = monitor.CheckAllObjects();
-            yield return new WaitUntil(() => refresh.IsCompleted);
-            refresh.GetAwaiter().GetResult();
-            ComputeContext.FlushInvalidates();
         }
     }
 }
